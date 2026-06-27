@@ -979,16 +979,21 @@
     background: var(--digit-bg);
     font-weight: 700;
   }
-  .number-bond-part.take {
+  /* Both bond parts begin gold: they are pieces of the same number,
+     not right/wrong choices. At the exact make-ten split, only the part
+     used first turns green; the leftover stays gold. */
+  .number-bond-part.take,
+  .number-bond-part.left {
+    border-color: rgba(245,200,66,0.72);
+    color: var(--accent);
+    background: rgba(245,200,66,0.08);
+    box-shadow: 0 0 9px rgba(245,200,66,0.12);
+  }
+  .number-bond.correct-bond .number-bond-part.take {
     border-color: var(--teal);
     color: var(--teal);
-    background: rgba(78,201,176,0.10);
-    box-shadow: 0 0 10px rgba(78,201,176,0.16);
-  }
-  .number-bond-part.left {
-    border-color: var(--accent3);
-    color: var(--accent3);
-    background: rgba(224,92,42,0.08);
+    background: rgba(78,201,176,0.12);
+    box-shadow: 0 0 12px rgba(78,201,176,0.22);
   }
   .number-bond-caption {
     text-align: center;
@@ -1045,6 +1050,18 @@
   }
   .decompose-helper:active {
     transform: scale(0.97);
+  }
+  .decompose-top-equation-target {
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  .decompose-top-equation-target:active {
+    transform: scale(0.96);
+    filter: brightness(1.2);
+  }
+  .decompose-helper.prebond-hidden {
+    display: none;
   }
   .decompose-helper.answer-open {
     width: min(300px, calc(100vw - 40px));
@@ -1542,6 +1559,7 @@ let mixedChallengeIndex = 1;
 let mixedChallengeCorrect = 0;
 let mixedChallengeComplete = false;
 let mixedLastOperation = '';
+let mixedSameOperationCount = 0;
 
 function mixedChallengeLabel() {
   return mixedChallengeComplete
@@ -1551,17 +1569,19 @@ function mixedChallengeLabel() {
 function loadNextMixedFact() {
   if (mixedChallengeComplete) return;
 
-  // Spell 1 must remain on Spell 1 after every answer. Previously the mixed
-  // challenge switched to the separate Make-Ten tab for addition questions,
-  // which felt like the app had navigated away. Keep the learner in the
-  // Number Bond workspace and load the next Spell 1 question here.
-  mixedLastOperation = '-';
+  // Randomly mix addition and subtraction while preventing long same-operation runs.
+  let op = Math.random() < 0.5 ? '+' : '-';
+  if (op === mixedLastOperation) mixedSameOperationCount += 1;
+  else mixedSameOperationCount = 1;
+  if (mixedSameOperationCount > 2) {
+    op = mixedLastOperation === '+' ? '-' : '+';
+    mixedSameOperationCount = 1;
+  }
+  mixedLastOperation = op;
   switchTab(0);
-  const pair = randomDecomposePair();
-  setDecomposeFact(pair.a, pair.b);
+  const pair = op === '+' ? randomAdditionBondPair() : randomDecomposePair();
+  setDecomposeFact(pair.a, pair.b, op);
 
-  // Put the newly rendered Spell 1 problem at the top after the previous
-  // keypad has closed and the layout has settled.
   requestAnimationFrame(() => requestAnimationFrame(() => scrollElementToPageTop(document.getElementById('decomposeWorkspace'), 'smooth')));
 }
 function startMixedChallenge() {
@@ -1570,6 +1590,7 @@ function startMixedChallenge() {
   mixedChallengeCorrect = 0;
   mixedChallengeComplete = false;
   mixedLastOperation = '';
+  mixedSameOperationCount = 0;
   loadNextMixedFact();
 }
 function advanceMixedChallengeAfterCorrect() {
@@ -1887,6 +1908,7 @@ function renderMakeTenSpell() {
 // ============================
 // SPELL II — DECOMPOSE SUBTRACTION
 // ============================
+let dcOperation = '-';
 let dcOrigA = 12;
 let dcOrigB = 5;
 let dcA = 12;
@@ -1910,6 +1932,18 @@ function clampDecomposeB(n) {
   if (isNaN(n)) return null;
   return Math.max(1, Math.min(20, n));
 }
+function randomAdditionBondPair() {
+  // Addition facts that can bridge cleanly to the next friendly ten.
+  let a, b, need;
+  do {
+    const tens = randInt(1, 3);
+    const ones = randInt(1, 9);
+    a = tens * 10 + ones;
+    need = 10 - ones;
+    b = randInt(need, 9);
+  } while (b < need);
+  return {a, b};
+}
 function randomDecomposePair() {
   // Easier starter facts: two-digit minuends and small subtrahends.
   // Example: 12 - 5 can become 10 - 3.
@@ -1922,15 +1956,14 @@ function randomDecomposePair() {
   } while (a - b < 0 || b - ones < 0);
   return {a, b};
 }
-function setDecomposeFact(a, b) {
+function setDecomposeFact(a, b, operation = dcOperation) {
+  dcOperation = operation === '+' ? '+' : '-';
   a = clampDecomposeA(a); b = clampDecomposeB(b);
-  if (a === null || b === null || a - b < 0) {
-    const pair = randomDecomposePair();
-    a = pair.a; b = pair.b;
-  }
-  const ones = a % 10;
-  if (ones === 0 || b < ones) {
-    const pair = randomDecomposePair();
+  const ones = a === null ? 0 : a % 10;
+  const needed = dcOperation === '+' ? (10 - ones) % 10 : ones;
+  const invalid = a === null || b === null || ones === 0 || b < needed || (dcOperation === '-' && a - b < 0);
+  if (invalid) {
+    const pair = dcOperation === '+' ? randomAdditionBondPair() : randomDecomposePair();
     a = pair.a; b = pair.b;
   }
   dcOrigA = a; dcOrigB = b;
@@ -1957,7 +1990,7 @@ function setDecomposeFromInputs() {
 }
 function randomDecomposeFact() {
   const pair = randomDecomposePair();
-  setDecomposeFact(pair.a, pair.b);
+  setDecomposeFact(pair.a, pair.b, '-');
 }
 function resetDecomposeShift() {
   dcShift = 0;
@@ -1969,7 +2002,7 @@ function resetDecomposeShift() {
 function moveDecompose(dir) {
   // dir = +1 shifts both numbers down by 1; dir = -1 shifts both numbers back up by 1.
   const proposed = dcShift + dir;
-  const newA = dcOrigA - proposed;
+  const newA = dcOperation === '+' ? dcOrigA + proposed : dcOrigA - proposed;
   const newB = dcOrigB - proposed;
   if (proposed < 0 || newA < 0 || newB < 0) return;
   dcShift = proposed;
@@ -1981,7 +2014,7 @@ function moveDecompose(dir) {
 function showDecompose() {
   const ones = dcOrigA % 10;
   if (ones > 0 && dcOrigB >= ones) dcShift = ones;
-  dcA = dcOrigA - dcShift;
+  dcA = dcOperation === '+' ? dcOrigA + dcShift : dcOrigA - dcShift;
   dcB = dcOrigB - dcShift;
   dcAnswerWrong = false; dcAnsweredCorrect = false; dcLastAnswer = '';
   renderDecomposeSpell();
@@ -1993,19 +2026,19 @@ function submitDecomposeAnswer() {
   const raw = input.value.trim();
   dcLastAnswer = raw;
   const userVal = parseInt(raw, 10);
-  const answer = dcOrigA - dcOrigB;
+  const answer = dcOperation === '+' ? dcOrigA + dcOrigB : dcOrigA - dcOrigB;
   const correct = raw !== '' && userVal === answer;
   dcAnswerWrong = !correct;
   dcAnsweredCorrect = correct;
   trackPracticeAttempt(
-    'Spell I: Decompose',
-    `${dcOrigA} − ${dcOrigB}`,
+    'Spell 1: Number Bond',
+    `${dcOrigA} ${dcOperation === '+' ? '+' : '−'} ${dcOrigB}`,
     raw,
     answer,
-    'Decompose to a friendly ten',
+    'Bridge to a friendly ten',
     correct
-      ? `${dcOrigA} − ${dcOrigB} was changed to ${dcA} − ${dcB}; entered ${raw}.`
-      : `${dcOrigA} − ${dcOrigB}; entered ${raw || 'blank'}; correct answer ${answer}.`,
+      ? `${dcOrigA} ${dcOperation === '+' ? '+' : '−'} ${dcOrigB} was changed to ${dcA} ${dcOperation === '+' ? '+' : '−'} ${dcB}; entered ${raw}.`
+      : `${dcOrigA} ${dcOperation === '+' ? '+' : '−'} ${dcOrigB}; entered ${raw || 'blank'}; correct answer ${answer}.`,
     correct,
     correct ? 10 : 0
   );
@@ -2090,6 +2123,17 @@ function positionDecomposeAnswerCard(helper) {
   helper.style.top = `${viewportTop + 10}px`;
 }
 
+function openTopLevelDecomposeAnswer(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  const helper = document.getElementById('dcSolveCard');
+  if (!helper) return;
+  helper.classList.remove('prebond-hidden');
+  openDecomposeAnswer(event, helper);
+}
+
 function openDecomposeAnswer(event, helper) {
   if (!helper) return;
   const alreadyOpen = helper.classList.contains('answer-open');
@@ -2128,30 +2172,42 @@ function openDecomposeAnswer(event, helper) {
   }
 }
 
-function decomposeNumberBondHtml(total, removed, firstNumber) {
+function decomposeNumberBondHtml(total, removed, firstNumber, operation) {
   total = Math.max(0, parseInt(total, 10) || 0);
   removed = Math.max(0, Math.min(total, parseInt(removed, 10) || 0));
   firstNumber = Math.max(0, parseInt(firstNumber, 10) || 0);
   const left = total - removed;
-  const firstStep = firstNumber - removed;
-  const helper = removed > 0
-    ? `<div class="decompose-helper" role="button" tabindex="0" aria-label="Then solve. Tap to enter your answer" onclick="openDecomposeAnswer(event,this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openDecomposeAnswer(event,this)}">
-        <div class="magic-poof" aria-hidden="true">${'<span></span>'.repeat(12)}</div>
-        <div class="decompose-helper-small">then solve</div>
-        <div class="decompose-final-expression"><span>${firstStep}</span><span class="decompose-mid-op">−</span><span>${left}</span><span>=</span><span class="decompose-answer-placeholder">?</span></div>
-        <div class="decompose-answer-pop" onclick="event.stopPropagation()">
-          <input id="dcAnswerInput" class="picker-input" type="number" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" placeholder="?" value="${dcLastAnswer}" onkeydown="if(event.key==='Enter')submitDecomposeAnswer()" aria-label="Numeric answer">
-          <button class="step-btn" onclick="event.stopPropagation();submitDecomposeAnswer()">✓ Check</button>
-        </div>
-      </div>`
-    : '';
-  return `<div class="number-bond" aria-label="number bond for ${total}">
+  const firstStep = operation === '+' ? firstNumber + removed : firstNumber - removed;
+  const ones = firstNumber % 10;
+  const target = operation === '+' ? 10 - ones : ones;
+  const finalOp = operation === '+' ? '+' : '−';
+  const correctBond = removed > 0 && removed === target;
+  const hiddenClass = removed === 0 ? ' prebond-hidden' : '';
+  const caption = correctBond
+    ? `${removed} goes first to reach ${firstStep}; ${left} remains`
+    : removed > 0
+      ? `${removed} goes first; ${left} remains`
+      : `split ${total} into two parts`;
+  const helper = `<div id="dcSolveCard" class="decompose-helper${hiddenClass}" role="button" tabindex="0" aria-label="Then solve. Tap to enter your answer" onclick="openDecomposeAnswer(event,this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openDecomposeAnswer(event,this)}">
+      <div class="magic-poof" aria-hidden="true">${'<span></span>'.repeat(12)}</div>
+      <div class="decompose-helper-small">then solve</div>
+      <div class="decompose-final-expression"><span>${firstStep}</span><span class="decompose-mid-op">${finalOp}</span><span>${left}</span><span>=</span><span class="decompose-answer-placeholder">?</span></div>
+      <div class="decompose-answer-pop" onclick="event.stopPropagation()">
+        <input id="dcAnswerInput" class="picker-input" type="number" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" placeholder="?" value="${dcLastAnswer}" onkeydown="if(event.key==='Enter')submitDecomposeAnswer()" aria-label="Numeric answer">
+        <button class="step-btn" onclick="event.stopPropagation();submitDecomposeAnswer()">✓ Check</button>
+      </div>
+    </div>`;
+  const bondPartsHtml = operation === '-'
+    // For subtraction, show the leftover first and the matching amount second.
+    // Example: 36 − 8 becomes the bond 2 and 6; the 6 is the part used
+    // first to reach 30, so it turns green together with the 6 in 36.
+    ? `<div class="number-bond-part left">${left}</div><div class="number-bond-part take">${removed}</div>`
+    // For addition, keep the make-ten amount first, e.g. 27 + 5 → 3 and 2.
+    : `<div class="number-bond-part take">${removed}</div><div class="number-bond-part left">${left}</div>`;
+  return `<div class="number-bond${correctBond ? ' correct-bond' : ''}" aria-label="number bond for ${total}">
     <div class="number-bond-lines"></div>
-    <div class="number-bond-parts">
-      <div class="number-bond-part take">${removed}</div>
-      <div class="number-bond-part left">${left}</div>
-    </div>
-    <div class="number-bond-caption">${removed} to make ten, ${left} left</div>
+    <div class="number-bond-parts">${bondPartsHtml}</div>
+    <div class="number-bond-caption">${caption}</div>
   </div>${helper}`;
 }
 
@@ -2167,12 +2223,14 @@ function decomposeValueHtml(value, highlightKeyPlace, commonReached = false) {
   }).join('');
 }
 function renderDecomposeSpell() {
-  const answer = dcOrigA - dcOrigB;
-  dcA = dcOrigA - dcShift;
+  const answer = dcOperation === '+' ? dcOrigA + dcOrigB : dcOrigA - dcOrigB;
+  dcA = dcOperation === '+' ? dcOrigA + dcShift : dcOrigA - dcShift;
   dcB = dcOrigB - dcShift;
   const ws = document.getElementById('decomposeWorkspace');
   if (!ws) return;
   const ones = dcOrigA % 10;
+  const needed = dcOperation === '+' ? 10 - ones : ones;
+  const opSymbol = dcOperation === '+' ? '+' : '−';
   const madeTen = dcA % 10 === 0;
   const canShiftDown = dcB > 0 && dcA > 0;
   const canShiftUp = dcShift > 0;
@@ -2180,11 +2238,15 @@ function renderDecomposeSpell() {
   if (mixedChallengeComplete) {
     guidance = `<strong>Challenge complete!</strong> You finished all ${STRATEGY_CHALLENGE_TOTAL} Decompose questions. Start a new challenge when ready.`;
   } else if (madeTen && dcShift > 0) {
-    guidance = `<strong>Good.</strong> The bond is set: take <strong>${dcShift}</strong> first, then subtract the leftover <strong>${dcB}</strong>.`;
-  } else if (ones > 0 && dcOrigB >= ones) {
-    guidance = `Take <strong>${ones}</strong> away from both numbers to bring <strong>${dcOrigA}</strong> down to <strong>${dcOrigA - ones}</strong>, or press <strong>Show me</strong>.`;
+    guidance = dcOperation === '+'
+      ? `<strong>Good.</strong> The bond is set: move <strong>${dcShift}</strong> to the first number, then add the leftover <strong>${dcB}</strong>.`
+      : `<strong>Good.</strong> The bond is set: take <strong>${dcShift}</strong> first, then subtract the leftover <strong>${dcB}</strong>.`;
+  } else if (needed > 0 && dcOrigB >= needed) {
+    guidance = dcOperation === '+'
+      ? `Move <strong>${needed}</strong> from <strong>${dcOrigB}</strong> to <strong>${dcOrigA}</strong> to reach <strong>${dcOrigA + needed}</strong>, or press <strong>Show me</strong>.`
+      : `Take <strong>${needed}</strong> away first to bring <strong>${dcOrigA}</strong> down to <strong>${dcOrigA - needed}</strong>, or press <strong>Show me</strong>.`;
   } else {
-    guidance = `Shift both numbers down by the same amount. The difference stays the same.`;
+    guidance = `Use the number bond to reach a friendly ten.`;
   }
   const aTenClass = '';
   const answerBorder = dcAnswerWrong ? 'var(--accent3)' : dcAnsweredCorrect ? '#50e090' : 'var(--accent)';
@@ -2201,42 +2263,42 @@ function renderDecomposeSpell() {
           <button class="transfer-btn" onclick="moveDecompose(1)" ${!canShiftDown ? 'disabled' : ''}>▼</button>
           <div class="transfer-change">${dcShift > 0 ? '−' + dcShift : 'start'}</div>
         </div>
-        <div class="transfer-value${aTenClass} place-value-wrap decompose-original-value">${decomposeValueHtml(dcOrigA, true, dcShift === ones && dcShift > 0)}</div>
+        <div class="transfer-value${aTenClass} place-value-wrap decompose-original-value decompose-top-equation-target" role="button" tabindex="0" aria-label="Enter answer for ${dcOrigA} ${dcOperation === '+' ? 'plus' : 'minus'} ${dcOrigB}" onclick="openTopLevelDecomposeAnswer(event)" onkeydown="if(event.key==='Enter'||event.key===' '){openTopLevelDecomposeAnswer(event)}">${decomposeValueHtml(dcOrigA, true, dcShift === ones && dcShift > 0)}</div>
       </div>
-      <div class="transfer-plus decompose-minus">−</div>
+      <div class="transfer-plus decompose-minus decompose-top-equation-target" role="button" tabindex="0" aria-label="Enter answer" onclick="openTopLevelDecomposeAnswer(event)" onkeydown="if(event.key==='Enter'||event.key===' '){openTopLevelDecomposeAnswer(event)}">${opSymbol}</div>
       <div class="transfer-number decompose-number-column">
         <div class="decompose-side-ticker right-side">
           <button class="transfer-btn" onclick="moveDecompose(-1)" ${!canShiftUp ? 'disabled' : ''}>▲</button>
           <button class="transfer-btn" onclick="moveDecompose(1)" ${!canShiftDown ? 'disabled' : ''}>▼</button>
           <div class="transfer-change">${dcShift > 0 ? '−' + dcShift : 'start'}</div>
         </div>
-        <div class="transfer-value decompose-original-value">${dcOrigB}</div>
-        ${decomposeNumberBondHtml(dcOrigB, dcShift, dcOrigA)}
+        <div class="transfer-value decompose-original-value decompose-top-equation-target" role="button" tabindex="0" aria-label="Enter answer for ${dcOrigA} ${dcOperation === '+' ? 'plus' : 'minus'} ${dcOrigB}" onclick="openTopLevelDecomposeAnswer(event)" onkeydown="if(event.key==='Enter'||event.key===' '){openTopLevelDecomposeAnswer(event)}">${dcOrigB}</div>
+        ${decomposeNumberBondHtml(dcOrigB, dcShift, dcOrigA, dcOperation)}
       </div>
     </div>
-    <div class="transfer-note">Tap either ▼ to fill the number bond. The original problem stays on the screen; use the bond to break ${dcOrigB} into the amount that makes ${dcOrigA} a ten and the leftover part.</div>
+    <div class="transfer-note">Tap either ▼ to fill the number bond. The original problem stays on the screen; use the bond to break ${dcOrigB} into the amount that makes ${dcOrigA} reach a friendly ten and the leftover part.</div>
     <div class="explanation" style="margin-bottom:12px;text-align:center">${guidance}</div>
-    ${dcAnswerWrong ? `<div style="text-align:center;font-size:0.86rem;color:var(--accent3);margin-bottom:10px">Not quite — use the number bond, then try the final subtraction.</div>` : ''}
-    ${dcAnsweredCorrect && !mixedChallengeComplete ? `<div style="text-align:center;font-size:0.9rem;color:#50e090;margin-bottom:10px">Correct — ${dcOrigA} − ${dcOrigB} = ${answer}! Loading the next question…</div>` : ''}
+    ${dcAnswerWrong ? `<div style="text-align:center;font-size:0.86rem;color:var(--accent3);margin-bottom:10px">Not quite — use the number bond, then try the final answer.</div>` : ''}
+    ${dcAnsweredCorrect && !mixedChallengeComplete ? `<div style="text-align:center;font-size:0.9rem;color:#50e090;margin-bottom:10px">Correct — ${dcOrigA} ${opSymbol} ${dcOrigB} = ${answer}! Loading the next question…</div>` : ''}
     <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
       <button class="step-btn" onclick="showDecompose()" style="margin-top:0">🔮 Show me</button>
-      <button class="reset-btn" onclick="resetDecomposeShift()" style="margin-top:0">↺ Back to ${dcOrigA} − ${dcOrigB}</button>
+      <button class="reset-btn" onclick="resetDecomposeShift()" style="margin-top:0">↺ Back to ${dcOrigA} ${opSymbol} ${dcOrigB}</button>
     </div>`;
 
   const balls = document.getElementById('decomposeBallDisplay');
   if (balls) {
     balls.innerHTML = `<div class="objects-label">Decompose Display</div>
       <div class="explanation" style="margin-bottom:14px;text-align:center">
-        The same amount is removed from both sides of the subtraction spell. That keeps the answer unchanged: <strong>${dcOrigA} − ${dcOrigB} = ${dcA} − ${dcB}</strong>.
+        ${dcOperation === '+' ? 'Move the same amount from the second addend to the first.' : 'Remove the same amount from both numbers.'} The answer stays unchanged: <strong>${dcOrigA} ${opSymbol} ${dcOrigB} = ${dcA} ${opSymbol} ${dcB}</strong>.
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
         <div class="val-chip" style="padding:12px">
-          <div class="label">Removed from A</div>
+          <div class="label">${dcOperation === '+' ? 'Moved to A' : 'Removed from A'}</div>
           ${leftoverDotsHtml(dcShift)}
           <div style="font-family:'Space Mono',monospace;font-size:1.2rem;font-weight:700;color:var(--teal);margin-top:8px">${dcShift}</div>
         </div>
         <div class="val-chip" style="padding:12px">
-          <div class="label">Removed from B</div>
+          <div class="label">${dcOperation === '+' ? 'Moved from B' : 'Removed from B'}</div>
           ${leftoverDotsHtml(dcShift)}
           <div style="font-family:'Space Mono',monospace;font-size:1.2rem;font-weight:700;color:var(--teal);margin-top:8px">${dcShift}</div>
         </div>
@@ -3525,7 +3587,7 @@ function switchTab(idx) {
 // ============================
 loadPracticeTracking();
 renderMakeTenSpell();
-randomDecomposeFact();
+startMixedChallenge();
 renderNearDoublesSpell();
 initTask1();
 initStrategy();
