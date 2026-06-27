@@ -1026,6 +1026,94 @@
     color: var(--accent2);
   }
 
+  /* Tappable answer reveal inside the “then solve” spell box */
+  .decompose-helper {
+    position: relative;
+    cursor: pointer;
+    overflow: visible;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .decompose-helper:active {
+    transform: scale(0.97);
+  }
+  .decompose-helper.answer-open {
+    width: 188px;
+    padding-bottom: 10px;
+    border-color: rgba(245,200,66,0.7);
+    box-shadow: 0 0 18px rgba(245,200,66,0.25);
+  }
+  .decompose-answer-pop {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 7px;
+    align-items: center;
+    max-height: 0;
+    opacity: 0;
+    transform: translateY(-5px) scale(0.94);
+    overflow: hidden;
+    pointer-events: none;
+    transition: max-height 0.24s ease, opacity 0.2s ease, transform 0.24s cubic-bezier(.2,.9,.25,1.25), margin-top 0.24s ease;
+    margin-top: 0;
+  }
+  .decompose-helper.answer-open .decompose-answer-pop {
+    max-height: 64px;
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+    margin-top: 9px;
+  }
+  .decompose-helper.answer-open .decompose-answer-placeholder { display:none; }
+  .decompose-answer-pop .picker-input {
+    width: 92px;
+    height: 42px;
+    font-size: 1.28rem;
+    padding: 5px 8px;
+  }
+  .decompose-answer-pop .step-btn {
+    margin: 0;
+    padding: 8px 11px;
+    height: 42px;
+    white-space: nowrap;
+  }
+  .magic-poof {
+    position:absolute;
+    left:50%;
+    top:50%;
+    width:1px;
+    height:1px;
+    pointer-events:none;
+    z-index:20;
+  }
+  .magic-poof span {
+    --x: 0px;
+    --y: -30px;
+    position:absolute;
+    width:15px;
+    height:15px;
+    left:-7px;
+    top:-7px;
+    border-radius:50%;
+    background: radial-gradient(circle, rgba(240,230,200,.82) 0 22%, rgba(120,110,150,.42) 48%, rgba(50,45,70,0) 74%);
+    filter: blur(1px);
+    opacity:0;
+    transform: translate(0,0) scale(.35);
+  }
+  .magic-poof.poof span { animation: magicSmoke .72s ease-out forwards; }
+  .magic-poof span:nth-child(1){--x:-44px;--y:-19px;animation-delay:0ms}
+  .magic-poof span:nth-child(2){--x:-31px;--y:-42px;animation-delay:25ms}
+  .magic-poof span:nth-child(3){--x:-5px;--y:-51px;animation-delay:45ms}
+  .magic-poof span:nth-child(4){--x:27px;--y:-42px;animation-delay:18ms}
+  .magic-poof span:nth-child(5){--x:47px;--y:-15px;animation-delay:38ms}
+  .magic-poof span:nth-child(6){--x:37px;--y:22px;animation-delay:8ms}
+  .magic-poof span:nth-child(7){--x:4px;--y:34px;animation-delay:32ms}
+  .magic-poof span:nth-child(8){--x:-35px;--y:21px;animation-delay:52ms}
+  @keyframes magicSmoke {
+    0% { opacity:0; transform:translate(0,0) scale(.3); }
+    18% { opacity:.9; }
+    100% { opacity:0; transform:translate(var(--x),var(--y)) scale(2.25) rotate(18deg); }
+  }
+
   /* Practice tracking */
   .score-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin: 0 0 20px; z-index: 1; position: relative; }
   .score-chip { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px 16px; text-align: center; min-width: 128px; }
@@ -1836,6 +1924,30 @@ function decomposeChallengeBanner() {
 }
 
 
+function openDecomposeAnswer(event, helper) {
+  if (!helper) return;
+  const alreadyOpen = helper.classList.contains('answer-open');
+  helper.classList.add('answer-open');
+
+  if (!alreadyOpen) {
+    const poof = helper.querySelector('.magic-poof');
+    if (poof) {
+      poof.classList.remove('poof');
+      void poof.offsetWidth;
+      poof.classList.add('poof');
+      setTimeout(() => poof.classList.remove('poof'), 850);
+    }
+  }
+
+  // Focus occurs directly inside the user's tap event so iPadOS opens
+  // its numeric keypad rather than merely revealing the field.
+  const input = helper.querySelector('#dcAnswerInput');
+  if (input) {
+    input.focus({preventScroll:true});
+    try { input.select(); } catch (e) {}
+  }
+}
+
 function decomposeNumberBondHtml(total, removed, firstNumber) {
   total = Math.max(0, parseInt(total, 10) || 0);
   removed = Math.max(0, Math.min(total, parseInt(removed, 10) || 0));
@@ -1843,9 +1955,14 @@ function decomposeNumberBondHtml(total, removed, firstNumber) {
   const left = total - removed;
   const firstStep = firstNumber - removed;
   const helper = removed > 0
-    ? `<div class="decompose-helper">
+    ? `<div class="decompose-helper" role="button" tabindex="0" aria-label="Then solve. Tap to enter your answer" onclick="openDecomposeAnswer(event,this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openDecomposeAnswer(event,this)}">
+        <div class="magic-poof" aria-hidden="true">${'<span></span>'.repeat(8)}</div>
         <div class="decompose-helper-small">then solve</div>
-        <div class="decompose-final-expression"><span>${firstStep}</span><span class="decompose-mid-op">−</span><span>${left}</span><span>= ?</span></div>
+        <div class="decompose-final-expression"><span>${firstStep}</span><span class="decompose-mid-op">−</span><span>${left}</span><span>=</span><span class="decompose-answer-placeholder">?</span></div>
+        <div class="decompose-answer-pop" onclick="event.stopPropagation()">
+          <input id="dcAnswerInput" class="picker-input" type="number" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" placeholder="?" value="${dcLastAnswer}" onkeydown="if(event.key==='Enter')submitDecomposeAnswer()" aria-label="Numeric answer">
+          <button class="step-btn" onclick="event.stopPropagation();submitDecomposeAnswer()">✓ Check</button>
+        </div>
       </div>`
     : '';
   return `<div class="number-bond" aria-label="number bond for ${total}">
