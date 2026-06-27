@@ -1102,6 +1102,69 @@
     pointer-events:none;
     z-index:20;
   }
+  .viewport-magic-poof {
+    position: fixed;
+    left: 50vw;
+    top: 42vh;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+    z-index: 99999;
+    transform: translateZ(0);
+  }
+  .viewport-magic-poof::before,
+  .viewport-magic-poof::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 28px;
+    height: 28px;
+    margin: -14px;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  .viewport-magic-poof::before {
+    border: 3px solid rgba(245,200,66,.88);
+    box-shadow: 0 0 26px rgba(245,200,66,.85), 0 0 58px rgba(78,201,176,.55);
+    animation: magicRing 1.15s ease-out forwards;
+  }
+  .viewport-magic-poof::after {
+    background: radial-gradient(circle, rgba(255,248,205,.95) 0 8%, rgba(245,200,66,.48) 22%, rgba(78,201,176,.20) 46%, transparent 72%);
+    animation: magicFlash 1.05s ease-out forwards;
+  }
+  .viewport-magic-poof span {
+    --x: 0px;
+    --y: -90px;
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    left: -15px;
+    top: -15px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,248,220,.96) 0 18%, rgba(165,145,195,.64) 46%, rgba(55,45,82,0) 78%);
+    filter: blur(1.4px);
+    opacity: 0;
+    transform: translate(0,0) scale(.25);
+    animation: magicSmokeBig 1.28s cubic-bezier(.12,.7,.24,1) forwards;
+  }
+  .viewport-magic-poof span:nth-child(1){--x:-150px;--y:-42px;animation-delay:0ms}
+  .viewport-magic-poof span:nth-child(2){--x:-128px;--y:-105px;animation-delay:22ms}
+  .viewport-magic-poof span:nth-child(3){--x:-78px;--y:-148px;animation-delay:42ms}
+  .viewport-magic-poof span:nth-child(4){--x:-18px;--y:-165px;animation-delay:14ms}
+  .viewport-magic-poof span:nth-child(5){--x:55px;--y:-150px;animation-delay:36ms}
+  .viewport-magic-poof span:nth-child(6){--x:120px;--y:-112px;animation-delay:8ms}
+  .viewport-magic-poof span:nth-child(7){--x:158px;--y:-52px;animation-delay:30ms}
+  .viewport-magic-poof span:nth-child(8){--x:166px;--y:20px;animation-delay:52ms}
+  .viewport-magic-poof span:nth-child(9){--x:130px;--y:88px;animation-delay:18ms}
+  .viewport-magic-poof span:nth-child(10){--x:70px;--y:132px;animation-delay:46ms}
+  .viewport-magic-poof span:nth-child(11){--x:5px;--y:148px;animation-delay:25ms}
+  .viewport-magic-poof span:nth-child(12){--x:-62px;--y:130px;animation-delay:55ms}
+  .viewport-magic-poof span:nth-child(13){--x:-120px;--y:92px;animation-delay:12ms}
+  .viewport-magic-poof span:nth-child(14){--x:-162px;--y:34px;animation-delay:38ms}
+  .viewport-magic-poof span:nth-child(15){--x:92px;--y:-28px;animation-delay:62ms}
+  .viewport-magic-poof span:nth-child(16){--x:-82px;--y:18px;animation-delay:68ms}
+
   .magic-poof span {
     --x: 0px;
     --y: -30px;
@@ -1129,6 +1192,22 @@
     0% { opacity:0; transform:translate(0,0) scale(.3); }
     18% { opacity:.9; }
     100% { opacity:0; transform:translate(var(--x),var(--y)) scale(2.25) rotate(18deg); }
+  }
+  @keyframes magicSmokeBig {
+    0% { opacity:0; transform:translate(0,0) scale(.2) rotate(0deg); }
+    12% { opacity:.98; }
+    58% { opacity:.72; }
+    100% { opacity:0; transform:translate(var(--x),var(--y)) scale(3.8) rotate(34deg); }
+  }
+  @keyframes magicRing {
+    0% { opacity:0; transform:scale(.2); }
+    16% { opacity:1; }
+    100% { opacity:0; transform:scale(8.8); }
+  }
+  @keyframes magicFlash {
+    0% { opacity:0; transform:scale(.3); }
+    12% { opacity:1; }
+    100% { opacity:0; transform:scale(9.5); }
   }
 
   /* Practice tracking */
@@ -1447,22 +1526,19 @@ function mixedChallengeLabel() {
 }
 function loadNextMixedFact() {
   if (mixedChallengeComplete) return;
-  let op = Math.random() < 0.5 ? '+' : '-';
-  // Avoid long runs of the same operation while keeping the order random.
-  if (op === mixedLastOperation && Math.random() < 0.45) op = op === '+' ? '-' : '+';
-  mixedLastOperation = op;
-  if (op === '+') {
-    switchTab(1);
-    const pair = randomMakeTenPair();
-    setMakeTenFact(pair.a, pair.b);
-  } else {
-    switchTab(0);
-    const pair = randomDecomposePair();
-    setDecomposeFact(pair.a, pair.b);
-  }
-  // Once the next mixed question is rendered, place it at the top so the
-  // learner does not have to manually recover from the on-screen keypad.
-  requestAnimationFrame(() => requestAnimationFrame(() => scrollActiveProblemToTop('smooth')));
+
+  // Spell 1 must remain on Spell 1 after every answer. Previously the mixed
+  // challenge switched to the separate Make-Ten tab for addition questions,
+  // which felt like the app had navigated away. Keep the learner in the
+  // Number Bond workspace and load the next Spell 1 question here.
+  mixedLastOperation = '-';
+  switchTab(0);
+  const pair = randomDecomposePair();
+  setDecomposeFact(pair.a, pair.b);
+
+  // Put the newly rendered Spell 1 problem at the top after the previous
+  // keypad has closed and the layout has settled.
+  requestAnimationFrame(() => requestAnimationFrame(() => scrollElementToPageTop(document.getElementById('decomposeWorkspace'), 'smooth')));
 }
 function startMixedChallenge() {
   mixedChallengeActive = true;
@@ -1969,6 +2045,17 @@ function scrollActiveProblemToTop(behavior = 'smooth') {
   scrollElementToPageTop(workspace || active, behavior);
 }
 
+function launchViewportMagicPoof(helper) {
+  if (!helper) return;
+  const oldPoof = document.querySelector('.viewport-magic-poof');
+  if (oldPoof) oldPoof.remove();
+  const poof = document.createElement('div');
+  poof.className = 'viewport-magic-poof';
+  poof.innerHTML = '<span></span>'.repeat(16);
+  document.body.appendChild(poof);
+  setTimeout(() => poof.remove(), 1500);
+}
+
 function openDecomposeAnswer(event, helper) {
   if (!helper) return;
   const alreadyOpen = helper.classList.contains('answer-open');
@@ -1981,21 +2068,24 @@ function openDecomposeAnswer(event, helper) {
       poof.classList.remove('poof');
       void poof.offsetWidth;
       poof.classList.add('poof');
-      setTimeout(() => poof.classList.remove('poof'), 850);
+      setTimeout(() => poof.classList.remove('poof'), 1250);
     }
+    // A fixed-position copy stays visible even while iPad Safari adjusts the
+    // viewport for its software keyboard.
+    launchViewportMagicPoof(helper);
   }
 
-  // Put the full problem at the top before the software keyboard reduces
-  // the viewport, then correct the position again after the keyboard opens.
   const workspace = document.getElementById('decomposeWorkspace');
-  scrollElementToPageTop(workspace, 'smooth');
-
   const input = helper.querySelector('#dcAnswerInput');
   if (input) {
+    // Focus synchronously so iPad opens the numeric keypad from this tap.
     input.focus({preventScroll:true});
     try { input.select(); } catch (e) {}
-    setTimeout(() => scrollElementToPageTop(workspace, 'smooth'), 180);
-    setTimeout(() => scrollElementToPageTop(workspace, 'auto'), 520);
+
+    // Let the smoke animation register first, then place the complete problem
+    // at the top once the keyboard has substantially finished opening.
+    setTimeout(() => scrollElementToPageTop(workspace, 'smooth'), 1120);
+    setTimeout(() => scrollElementToPageTop(workspace, 'auto'), 1500);
   }
 }
 
@@ -2007,7 +2097,7 @@ function decomposeNumberBondHtml(total, removed, firstNumber) {
   const firstStep = firstNumber - removed;
   const helper = removed > 0
     ? `<div class="decompose-helper" role="button" tabindex="0" aria-label="Then solve. Tap to enter your answer" onclick="openDecomposeAnswer(event,this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openDecomposeAnswer(event,this)}">
-        <div class="magic-poof" aria-hidden="true">${'<span></span>'.repeat(8)}</div>
+        <div class="magic-poof" aria-hidden="true">${'<span></span>'.repeat(12)}</div>
         <div class="decompose-helper-small">then solve</div>
         <div class="decompose-final-expression"><span>${firstStep}</span><span class="decompose-mid-op">−</span><span>${left}</span><span>=</span><span class="decompose-answer-placeholder">?</span></div>
         <div class="decompose-answer-pop" onclick="event.stopPropagation()">
@@ -3396,7 +3486,7 @@ function switchTab(idx) {
 // ============================
 loadPracticeTracking();
 renderMakeTenSpell();
-renderDecomposeSpell();
+randomDecomposeFact();
 renderNearDoublesSpell();
 initTask1();
 initStrategy();
