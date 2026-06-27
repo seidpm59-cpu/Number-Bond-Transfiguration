@@ -1088,6 +1088,21 @@
     height: 46px;
     white-space: nowrap;
   }
+
+  /* Keep the answer card visible while the iPad numeric keyboard opens. */
+  .decompose-helper.keyboard-anchor {
+    position: fixed !important;
+    z-index: 10050;
+    margin: 0 !important;
+    width: min(330px, calc(100vw - 24px)) !important;
+    max-width: 330px;
+    transform: translateX(-50%) !important;
+    background: rgba(30, 34, 20, 0.98);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 10px 34px rgba(0,0,0,0.72), 0 0 30px rgba(245,200,66,0.34) !important;
+  }
+
   @media (max-width: 430px) {
     .decompose-helper.answer-open { padding-left: 12px; padding-right: 12px; }
     .decompose-answer-pop { gap: 8px; }
@@ -2056,10 +2071,21 @@ function launchViewportMagicPoof(helper) {
   setTimeout(() => poof.remove(), 1500);
 }
 
+function positionDecomposeAnswerCard(helper) {
+  if (!helper) return;
+  const vv = window.visualViewport;
+  const viewportLeft = vv ? vv.offsetLeft : 0;
+  const viewportTop = vv ? vv.offsetTop : 0;
+  const viewportWidth = vv ? vv.width : window.innerWidth;
+  helper.style.left = `${viewportLeft + viewportWidth / 2}px`;
+  helper.style.top = `${viewportTop + 10}px`;
+}
+
 function openDecomposeAnswer(event, helper) {
   if (!helper) return;
   const alreadyOpen = helper.classList.contains('answer-open');
-  helper.classList.add('answer-open');
+  helper.classList.add('answer-open', 'keyboard-anchor');
+  positionDecomposeAnswerCard(helper);
   lightTactileFeedback();
 
   if (!alreadyOpen) {
@@ -2070,22 +2096,26 @@ function openDecomposeAnswer(event, helper) {
       poof.classList.add('poof');
       setTimeout(() => poof.classList.remove('poof'), 1250);
     }
-    // A fixed-position copy stays visible even while iPad Safari adjusts the
-    // viewport for its software keyboard.
     launchViewportMagicPoof(helper);
   }
 
-  const workspace = document.getElementById('decomposeWorkspace');
+  const keepPinned = () => positionDecomposeAnswerCard(helper);
+  if (window.visualViewport && !helper._viewportPinned) {
+    helper._viewportPinned = true;
+    window.visualViewport.addEventListener('resize', keepPinned);
+    window.visualViewport.addEventListener('scroll', keepPinned);
+  }
+
   const input = helper.querySelector('#dcAnswerInput');
   if (input) {
-    // Focus synchronously so iPad opens the numeric keypad from this tap.
+    // Focus during the original tap so iPad opens its numeric keypad. The
+    // answer card itself remains pinned above the keyboard, so no follow-up
+    // page scroll can hide the problem the student is solving.
     input.focus({preventScroll:true});
     try { input.select(); } catch (e) {}
-
-    // Let the smoke animation register first, then place the complete problem
-    // at the top once the keyboard has substantially finished opening.
-    setTimeout(() => scrollElementToPageTop(workspace, 'smooth'), 1120);
-    setTimeout(() => scrollElementToPageTop(workspace, 'auto'), 1500);
+    requestAnimationFrame(() => positionDecomposeAnswerCard(helper));
+    setTimeout(() => positionDecomposeAnswerCard(helper), 250);
+    setTimeout(() => positionDecomposeAnswerCard(helper), 650);
   }
 }
 
