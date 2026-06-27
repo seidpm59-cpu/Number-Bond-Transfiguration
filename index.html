@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Number Bond Transfigurations</title>
+<title>Spell 1: Number Bond</title>
 <link href="https://fonts.googleapis.com/css2?family=MedievalSharp&family=Cinzel:wght@400;700;900&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -1086,13 +1086,13 @@
     <circle cx="25" cy="100" r="1.5" fill="#f5c842" opacity="0.6"><animate attributeName="opacity" values="0.6;0.1;0.6" dur="2.5s" repeatCount="indefinite"/></circle>
     <circle cx="98" cy="95" r="2" fill="#f5c842" opacity="0.5"><animate attributeName="opacity" values="0.5;0.1;0.5" dur="1.9s" repeatCount="indefinite"/></circle>
   </svg>
-  <h1>Number Bond Transfigurations</h1>
+  <h1>Spell 1: Number Bond</h1>
   <p class="subtitle">Learn the ancient magic of moving the decimal point</p>
   <div class="house-rule"></div>
 </div>
 
 <div class="tabs">
-  <button class="tab-btn active" onclick="switchTab(0)">✦ Spell I: Decompose</button>
+  <button class="tab-btn active" onclick="switchTab(0)">✦ Spell 1: Number Bond</button>
   <button class="tab-btn" onclick="switchTab(1)">✦ Spell II: Make Ten</button>
   <button class="tab-btn" onclick="switchTab(2)">✦ Spell III: Near Doubles</button>
   <button class="tab-btn" onclick="switchTab(3)">✦ Spell IV: Strategy</button>
@@ -3233,7 +3233,7 @@ renderNearDoublesSpell();
 initTask1();
 initStrategy();
 renderHistoryPanel();
-startMixedChallenge();
+switchTab(0);
 </script>
 </body>
 </html>
