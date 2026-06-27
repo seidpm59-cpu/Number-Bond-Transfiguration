@@ -665,8 +665,17 @@
     gap: 7px;
     z-index: 4;
   }
-  .decompose-side-ticker.left-side { left: -54px; }
-  .decompose-side-ticker.right-side { right: -54px; }
+  .decompose-side-ticker.left-side { left: -68px; }
+  .decompose-side-ticker.right-side { right: -68px; }
+  .decompose-side-ticker .transfer-btn {
+    width: 52px;
+    min-width: 52px;
+    height: 52px;
+    border-radius: 10px;
+    font-size: 1.35rem;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
   .decompose-side-ticker .transfer-change {
     min-height: 0;
     margin-top: 1px;
@@ -675,9 +684,9 @@
   @media (max-width: 560px) {
     .decompose-transfer { gap: 42px; }
     .decompose-number-column { min-width: 112px; }
-    .decompose-side-ticker.left-side { left: -43px; }
-    .decompose-side-ticker.right-side { right: -43px; }
-    .decompose-side-ticker .transfer-btn { min-width: 34px; width: 34px; }
+    .decompose-side-ticker.left-side { left: -58px; }
+    .decompose-side-ticker.right-side { right: -58px; }
+    .decompose-side-ticker .transfer-btn { min-width: 50px; width: 50px; height: 50px; font-size: 1.3rem; }
   }
   .decompose-transfer .decompose-minus {
     position: absolute;
