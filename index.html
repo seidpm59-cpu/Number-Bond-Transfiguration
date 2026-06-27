@@ -1038,16 +1038,17 @@
     transform: scale(0.97);
   }
   .decompose-helper.answer-open {
-    width: 188px;
-    padding-bottom: 10px;
-    border-color: rgba(245,200,66,0.7);
-    box-shadow: 0 0 18px rgba(245,200,66,0.25);
+    width: min(300px, calc(100vw - 40px));
+    padding: 16px 16px 14px;
+    border-color: rgba(245,200,66,0.78);
+    box-shadow: 0 0 22px rgba(245,200,66,0.28);
   }
   .decompose-answer-pop {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 7px;
+    display: flex;
+    justify-content: center;
     align-items: center;
+    gap: 10px;
+    width: 100%;
     max-height: 0;
     opacity: 0;
     transform: translateY(-5px) scale(0.94);
@@ -1057,24 +1058,40 @@
     margin-top: 0;
   }
   .decompose-helper.answer-open .decompose-answer-pop {
-    max-height: 64px;
+    max-height: 72px;
     opacity: 1;
     transform: translateY(0) scale(1);
     pointer-events: auto;
-    margin-top: 9px;
+    margin-top: 12px;
   }
   .decompose-helper.answer-open .decompose-answer-placeholder { display:none; }
   .decompose-answer-pop .picker-input {
-    width: 92px;
-    height: 42px;
-    font-size: 1.28rem;
-    padding: 5px 8px;
+    flex: 1 1 110px;
+    min-width: 0;
+    max-width: 135px;
+    width: auto;
+    height: 46px;
+    font-size: 1.32rem;
+    padding: 6px 10px;
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+  .decompose-answer-pop .picker-input::-webkit-outer-spin-button,
+  .decompose-answer-pop .picker-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
   }
   .decompose-answer-pop .step-btn {
+    flex: 0 0 auto;
     margin: 0;
-    padding: 8px 11px;
-    height: 42px;
+    padding: 8px 14px;
+    height: 46px;
     white-space: nowrap;
+  }
+  @media (max-width: 430px) {
+    .decompose-helper.answer-open { padding-left: 12px; padding-right: 12px; }
+    .decompose-answer-pop { gap: 8px; }
+    .decompose-answer-pop .step-btn { padding-left: 10px; padding-right: 10px; font-size: 0.8rem; }
   }
   .magic-poof {
     position:absolute;
@@ -1443,6 +1460,9 @@ function loadNextMixedFact() {
     const pair = randomDecomposePair();
     setDecomposeFact(pair.a, pair.b);
   }
+  // Once the next mixed question is rendered, place it at the top so the
+  // learner does not have to manually recover from the on-screen keypad.
+  requestAnimationFrame(() => requestAnimationFrame(() => scrollActiveProblemToTop('smooth')));
 }
 function startMixedChallenge() {
   mixedChallengeActive = true;
@@ -1869,6 +1889,7 @@ function showDecompose() {
 function submitDecomposeAnswer() {
   const input = document.getElementById('dcAnswerInput');
   if (!input) return;
+  lightTactileFeedback();
   const raw = input.value.trim();
   dcLastAnswer = raw;
   const userVal = parseInt(raw, 10);
@@ -1888,8 +1909,12 @@ function submitDecomposeAnswer() {
     correct,
     correct ? 10 : 0
   );
+  if (correct) {
+    try { input.blur(); } catch (e) {}
+  }
   renderDecomposeSpell();
   if (correct) advanceMixedChallengeAfterCorrect();
+  else requestAnimationFrame(() => scrollActiveProblemToTop('smooth'));
 }
 function resetDecomposeChallenge() {
   dcChallengeActive = true;
@@ -1924,10 +1949,31 @@ function decomposeChallengeBanner() {
 }
 
 
+function lightTactileFeedback() {
+  // Best-effort haptics. iPad Safari currently does not expose true webpage
+  // vibration, so the press animation remains the tactile fallback there.
+  try {
+    if (navigator.vibrate) navigator.vibrate(14);
+  } catch (e) {}
+}
+
+function scrollElementToPageTop(el, behavior = 'smooth') {
+  if (!el) return;
+  const top = Math.max(0, window.scrollY + el.getBoundingClientRect().top - 8);
+  window.scrollTo({ top, behavior });
+}
+
+function scrollActiveProblemToTop(behavior = 'smooth') {
+  const active = document.querySelector('.tab-panel.active');
+  const workspace = active && active.querySelector('[id$="Workspace"]');
+  scrollElementToPageTop(workspace || active, behavior);
+}
+
 function openDecomposeAnswer(event, helper) {
   if (!helper) return;
   const alreadyOpen = helper.classList.contains('answer-open');
   helper.classList.add('answer-open');
+  lightTactileFeedback();
 
   if (!alreadyOpen) {
     const poof = helper.querySelector('.magic-poof');
@@ -1939,12 +1985,17 @@ function openDecomposeAnswer(event, helper) {
     }
   }
 
-  // Focus occurs directly inside the user's tap event so iPadOS opens
-  // its numeric keypad rather than merely revealing the field.
+  // Put the full problem at the top before the software keyboard reduces
+  // the viewport, then correct the position again after the keyboard opens.
+  const workspace = document.getElementById('decomposeWorkspace');
+  scrollElementToPageTop(workspace, 'smooth');
+
   const input = helper.querySelector('#dcAnswerInput');
   if (input) {
     input.focus({preventScroll:true});
     try { input.select(); } catch (e) {}
+    setTimeout(() => scrollElementToPageTop(workspace, 'smooth'), 180);
+    setTimeout(() => scrollElementToPageTop(workspace, 'auto'), 520);
   }
 }
 
